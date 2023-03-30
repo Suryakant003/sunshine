@@ -1,112 +1,141 @@
-#include "rlImGui.h"
-#include "Physics.h"
-#include "Collision.h"
+#include "raylib.h"
+#include <stdbool.h>
+#include <time.h>
 
-#include <array>
-#include <vector>
-#include <string>
-#include <iostream>
-#include <fstream>
+void DrawCircle(Vector2 position, float radius, Color color);
+void ShowCustomCursor(void);
+void DrawBackgroundLines(int screenWidth, int screenHeight, int spacing, Color color);
 
-using namespace std;
-
-int main(void)
+int main()
 {
     const int screenWidth = 1280;
     const int screenHeight = 720;
-    InitWindow(screenWidth, screenHeight, "Sunshine");
-    rlImGuiSetup(true);
+    const int lineSpacing = 10;
+    const Color lineColor = LIGHTGRAY;
 
-    vector<Rectangle> obstacles;
-    std::ifstream inFile("../game/assets/data/obstacles.txt");
-    while (!inFile.eof())
-    {
-        Rectangle obstacle;
-        inFile >> obstacle.x >> obstacle.y >> obstacle.width >> obstacle.height;
-        obstacles.push_back(obstacle);
-    }
-    inFile.close();
+    InitWindow(screenWidth, screenHeight, "lab1");
 
-    float playerRotation = 0.0f;
-    const float playerWidth = 60.0f;
-    const float playerHeight = 40.0f;
-    const float playerRange = 1000.0f;
-    const float playerRotationSpeed = 100.0f;
 
-    const char* recText = "Nearest to Rectangle";
-    const char* circleText = "Nearest to Circle";
-    const char* poiText = "Nearest Intersection";
-    const int fontSize = 10;
-    const int recTextWidth = MeasureText(recText, fontSize);
-    const int circleTextWidth = MeasureText(circleText, fontSize);
-    const int poiTextWidth = MeasureText(poiText, fontSize);
-
-    const Rectangle rectangle{ 1000.0f, 500.0f, 160.0f, 90.0f };
-    const Circle circle{ { 1000.0f, 250.0f }, 50.0f };
-
-    bool demoGUI = false;
     SetTargetFPS(60);
+
+    // Moving circle changes color while overlapping
+
+    Vector2 circlePosition = { screenWidth / 2, screenHeight / 4 };
+    float circleRadius = 50;
+    Color circle1Color = ORANGE;
+    Color circle2Color = BLACK;
+
+    // Adding a triangle
+
+    Vector2 trianglePoint1 = { screenWidth / 8, screenHeight / 8 - 50 };
+    Vector2 trianglePoint2 = { screenWidth / 8 - 50, screenHeight / 8 + 50 };
+    Vector2 trianglePoint3 = { screenWidth / 8 + 50, screenHeight / 8 + 50 };
+
+    // Adding a rectangle
+
+    Rectangle rectangle = { screenWidth / 8 - 50, screenHeight / 8 + 70, 100, 50 };
+    Color rectangleColor = GREEN;
+
+    int randomNumber = 0;
+    double elapsedTime = 0;
+    double interval = 2.0; // 2 seconds
+
     while (!WindowShouldClose())
     {
-        float dt = GetFrameTime();
-        if (IsKeyDown(KEY_E))
-            playerRotation += playerRotationSpeed * dt;
-        if (IsKeyDown(KEY_Q))
-            playerRotation -= playerRotationSpeed * dt;
+        // Update
+        if (IsKeyDown(KEY_RIGHT))
+        {
+            circlePosition.x += 5;
+        }
+        else if (IsKeyDown(KEY_LEFT))
+        {
+            circlePosition.x -= 5;
+        }
+        else if (IsKeyDown(KEY_UP))
+        {
+            circlePosition.y -= 5;
+        }
+        else if (IsKeyDown(KEY_DOWN))
+        {
+            circlePosition.y += 5;
+        }
 
-        const Vector2 playerPosition = GetMousePosition();
-        const Vector2 playerDirection = Direction(playerRotation * DEG2RAD);
-        const Vector2 playerEnd = playerPosition + playerDirection * playerRange;
-        const Rectangle playerRec{ playerPosition.x, playerPosition.y, playerWidth, playerHeight };
+        Vector2 mousePosition = GetMousePosition();
 
-        const Vector2 nearestRecPoint = NearestPoint(playerPosition, playerEnd,
-            { rectangle.x + rectangle.width * 0.5f, rectangle.y + rectangle.height * 0.5f });
-        const Vector2 nearestCirclePoint = NearestPoint(playerPosition, playerEnd, circle.position);
-        Vector2 poi;
-
-        const bool collision = NearestIntersection(playerPosition, playerEnd, obstacles, poi);
-        const bool rectangleVisible = IsRectangleVisible(playerPosition, playerEnd, rectangle, obstacles);
-        const bool circleVisible = IsCircleVisible(playerPosition, playerEnd, circle, obstacles);
+        bool isOverlapping = CheckCollisionCircles(circlePosition, circleRadius, mousePosition, circleRadius);
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
-        // Render player
-        DrawRectanglePro(playerRec, { playerWidth * 0.5f, playerHeight * 0.5f }, playerRotation, PURPLE);
-        DrawLine(playerPosition.x, playerPosition.y, playerEnd.x, playerEnd.y, BLUE);
-        DrawCircleV(playerPosition, 10.0f, BLUE);
+        // Draw the background lines
+        DrawBackgroundLines(screenWidth, screenHeight, lineSpacing, lineColor);
 
-        // Render geometry
-        for (const Rectangle& obstacle : obstacles)
-            DrawRectangleRec(obstacle, GREEN);
-        DrawRectangleRec(rectangle, rectangleVisible ? GREEN : RED);
-        DrawCircleV(circle.position, circle.radius, circleVisible ? GREEN : RED);
+        // Draw the first stationary circle
+        DrawCircle(circlePosition, circleRadius, circle1Color);
 
-        // Render labels
-        DrawText(circleText, nearestCirclePoint.x - circleTextWidth * 0.5f, nearestCirclePoint.y - fontSize * 2, fontSize, BLUE);
-        DrawCircleV(nearestRecPoint, 10.0f, BLUE);
-        DrawText(recText, nearestRecPoint.x - recTextWidth * 0.5f, nearestRecPoint.y - fontSize * 2, fontSize, BLUE);
-        DrawCircleV(nearestCirclePoint, 10.0f, BLUE);
-        if (collision)
+        // Draw the second circle at the mouse cursor position
+        if (isOverlapping)
         {
-            DrawText(poiText, poi.x - poiTextWidth * 0.5f, poi.y - fontSize * 2, fontSize, BLUE);
-            DrawCircleV(poi, 10.0f, BLUE);
+            DrawCircle(mousePosition, circleRadius, circle2Color);
+        }
+        else
+        {
+            DrawCircle(mousePosition, circleRadius, circle1Color);
         }
 
-        // Render GUI
-        if (IsKeyPressed(KEY_GRAVE)) demoGUI = !demoGUI;
-        if (demoGUI)
+        // Draw the triangle
+        DrawTriangle(trianglePoint1, trianglePoint2, trianglePoint3, BLUE);
+
+        // Draw the rectangle
+        DrawRectangleRec(rectangle, rectangleColor);
+
+        // Draw a horizontal line
+        DrawLine(0, screenHeight / 2, screenWidth, screenHeight / 2, RED);
+
+        // Generate random number every 2 seconds
+        elapsedTime += GetFrameTime();
+        if (elapsedTime >= interval)
         {
-            rlImGuiBegin();
-            ImGui::ShowDemoWindow(nullptr);
-            rlImGuiEnd();
+            randomNumber = GetRandomValue(0, 100);
+            elapsedTime = 0;
         }
+
+        // Display the random number
+        DrawText(TextFormat("Random Number: %d", randomNumber), 10, 10, 20, BLACK);
+
+        // Display the current FPS
+        DrawText(TextFormat("FPS: %d", GetFPS()), 10, 40, 20, BLACK);
+
+        // Show custom cursor
+        ShowCustomCursor();
 
         EndDrawing();
     }
 
-    rlImGuiShutdown();
     CloseWindow();
 
     return 0;
+}
+
+void DrawCircle(Vector2 position, float radius, Color color)
+{
+    DrawCircleV(position, radius, color);
+}
+
+void ShowCustomCursor()
+{
+    DrawRectangle(GetMouseX(), GetMouseY(), 10, 10, RED);
+}
+
+void DrawBackgroundLines(int screenWidth, int screenHeight, int spacing, Color color)
+{
+    for (int i = 0; i < screenWidth; i += spacing)
+    {
+        DrawLine(i, 0, i, screenHeight, color);
+    }
+
+    for (int j = 0; j < screenHeight; j += spacing)
+    {
+        DrawLine(0, j, screenWidth, j, color);
+    }
 }
